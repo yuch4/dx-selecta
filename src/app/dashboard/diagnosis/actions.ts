@@ -106,7 +106,7 @@ export async function completeSession(sessionId: string) {
     throw new Error("セッションの完了に失敗しました");
   }
   
-  redirect(`/search?sessionId=${sessionId}`);
+  redirect(`/dashboard/search?sessionId=${sessionId}`);
 }
 
 // 現在のユーザーのテナントを取得
