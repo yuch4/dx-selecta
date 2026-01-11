@@ -1,0 +1,5 @@
+「PRDを作成して」        → prd-writing が発火
+「機能設計して」          → functional-design が発火
+「技術選定を整理して」    → architecture-design が発火
+「ディレクトリ構成を決めて」→ repository-structure が発火
+「用語集を作って」        → glossary-creation が発火
