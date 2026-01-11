@@ -1,0 +1,121 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
+import { ProposalView } from "@/components/proposal/proposal-view";
+import { ProposalActions } from "@/components/proposal/proposal-actions";
+import { generateProposal, getProposal } from "../actions";
+import type { ProposalOutput } from "@/types/proposal";
+import { Loader2 } from "lucide-react";
+
+export function ProposalContent() {
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get("sessionId");
+  const runId = searchParams.get("runId");
+  const solutionId = searchParams.get("solutionId");
+  
+  const [proposal, setProposal] = useState<ProposalOutput | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // 稟議書生成/取得
+  const loadProposal = useCallback(async () => {
+    if (!runId || !solutionId) {
+      setError("パラメータが不足しています");
+      setIsLoading(false);
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // 既存の稟議書を確認
+      let existingProposal = await getProposal(runId, solutionId);
+      
+      // なければ生成
+      if (!existingProposal) {
+        existingProposal = await generateProposal(runId, solutionId);
+      }
+      
+      setProposal(existingProposal);
+    } catch (err) {
+      console.error("Proposal load error:", err);
+      setError(err instanceof Error ? err.message : "稟議書の読み込みに失敗しました");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [runId, solutionId]);
+  
+  useEffect(() => {
+    loadProposal();
+  }, [loadProposal]);
+  
+  // 再生成
+  const handleRegenerate = async () => {
+    if (!runId || !solutionId) return;
+    
+    setIsRegenerating(true);
+    try {
+      const newProposal = await generateProposal(runId, solutionId);
+      setProposal(newProposal);
+    } catch (err) {
+      console.error("Regenerate error:", err);
+      setError(err instanceof Error ? err.message : "再生成に失敗しました");
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+  
+  // ローディング中
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="mt-4 text-muted-foreground">稟議書を生成中...</p>
+      </div>
+    );
+  }
+  
+  // エラー時
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-destructive">{error}</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          <a href={sessionId ? `/search?sessionId=${sessionId}` : "/diagnosis"} className="underline hover:text-primary">
+            検索結果に戻る
+          </a>
+        </p>
+      </div>
+    );
+  }
+  
+  if (!proposal) {
+    return null;
+  }
+  
+  return (
+    <div className="space-y-6">
+      {/* バージョン情報 */}
+      <div className="text-sm text-muted-foreground">
+        バージョン {proposal.version} | 生成日時: {new Date(proposal.generated_at).toLocaleString("ja-JP")}
+      </div>
+      
+      {/* 稟議書表示 */}
+      <ProposalView proposal={proposal} />
+      
+      {/* アクション */}
+      {sessionId && runId && (
+        <ProposalActions
+          sessionId={sessionId}
+          runId={runId}
+          markdownText={proposal.markdown_text || ""}
+          onRegenerate={handleRegenerate}
+          isRegenerating={isRegenerating}
+        />
+      )}
+    </div>
+  );
+}
