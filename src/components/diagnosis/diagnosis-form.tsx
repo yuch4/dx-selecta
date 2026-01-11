@@ -9,7 +9,7 @@ import { StepProblems } from "./step-problems";
 import { StepConstraints } from "./step-constraints";
 import { StepWeights } from "./step-weights";
 import { StepConfirm } from "./step-confirm";
-import { createSession, saveInput, completeSession } from "@/app/(dashboard)/diagnosis/actions";
+import { createSession, saveInput, completeSession } from "@/app/dashboard/diagnosis/actions";
 import { DEFAULT_FORM_DATA, type DiagnosisFormData } from "@/types/diagnosis";
 
 const STEPS = [
