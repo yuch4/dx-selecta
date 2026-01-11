@@ -13,8 +13,8 @@ export default async function DiagnosisPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">診断</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-xl font-semibold tracking-tight">診断</h1>
+        <p className="text-[13px] text-muted-foreground">
           会社属性や要件を入力して、最適なSaaSを診断します
         </p>
       </div>

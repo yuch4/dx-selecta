@@ -110,42 +110,77 @@ export async function completeSession(sessionId: string) {
 }
 
 // 現在のユーザーのテナントを取得
-export async function getUserTenant() {
+export async function getUserTenant(): Promise<unknown | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  
+
   if (!user) {
     return null;
   }
-  
+
   // ユーザーが所属するテナントを取得
-  const { data: membership } = await supabase
+  const { data: membership, error: membershipError } = await supabase
     .from("tenant_members")
     .select("tenant_id, tenants(*)")
     .eq("user_id", user.id)
-    .single();
-  
+    .limit(1)
+    .maybeSingle();
+
+  if (membershipError) {
+    console.error("Tenant membership fetch error:", membershipError);
+    return null;
+  }
+
   if (!membership) {
     // テナントがない場合は自動作成
     const { data: newTenant, error } = await supabase
       .rpc("create_tenant_with_owner", { tenant_name: "マイ組織" });
-    
+
     if (error) {
       console.error("Tenant creation error:", error);
       return null;
     }
-    
+
+    const tenantId = typeof newTenant === "string"
+      ? newTenant
+      : newTenant?.id ?? newTenant?.tenant_id;
+
+    if (!tenantId) {
+      console.error("Tenant creation returned no id:", newTenant);
+      return null;
+    }
+
     // 作成したテナントを取得
-    const { data: tenant } = await supabase
+    const { data: tenant, error: tenantError } = await supabase
       .from("tenants")
       .select("*")
-      .eq("id", newTenant)
-      .single();
-    
+      .eq("id", tenantId)
+      .maybeSingle();
+
+    if (tenantError) {
+      console.error("Tenant fetch error:", tenantError);
+      return null;
+    }
+
     return tenant;
   }
-  
-  return membership.tenants;
+
+  if (membership.tenants) {
+    return membership.tenants;
+  }
+
+  const { data: tenant, error: tenantError } = await supabase
+    .from("tenants")
+    .select("*")
+    .eq("id", membership.tenant_id)
+    .maybeSingle();
+
+  if (tenantError) {
+    console.error("Tenant fetch error:", tenantError);
+    return null;
+  }
+
+  return tenant;
 }
 
 // セッション取得

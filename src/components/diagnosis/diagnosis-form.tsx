@@ -66,44 +66,54 @@ export function DiagnosisForm({ tenantId }: DiagnosisFormProps) {
   };
 
   return (
-    <div className="space-y-6">
-      {/* プログレスバー */}
-      <div className="space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">
-            ステップ {currentStep} / {STEPS.length}
-          </span>
-          <span className="font-medium">{STEPS[currentStep - 1].title}</span>
+    <div className="mx-auto max-w-2xl space-y-6">
+      {/* Progress Header */}
+      <div className="space-y-4">
+        {/* Step indicator with labels */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="font-data text-[11px] uppercase tracking-wide text-muted-foreground">
+              STEP {currentStep} OF {STEPS.length}
+            </p>
+            <h2 className="text-lg font-semibold tracking-tight">{STEPS[currentStep - 1].title}</h2>
+          </div>
+          <div className="text-right">
+            <span className="font-data text-2xl font-semibold text-primary">
+              {Math.round(progress)}%
+            </span>
+          </div>
         </div>
-        <Progress value={progress} className="h-2" />
+        
+        {/* Progress bar */}
+        <Progress value={progress} className="h-1.5" />
+        
+        {/* Step dots */}
+        <div className="flex justify-center gap-2 pt-1">
+          {STEPS.map((step) => (
+            <div
+              key={step.id}
+              className={`h-1.5 w-1.5 rounded-full transition-all duration-200 ${
+                step.id === currentStep
+                  ? "w-4 bg-primary"
+                  : step.id < currentStep
+                  ? "bg-primary/60"
+                  : "bg-border"
+              }`}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* ステップインジケーター */}
-      <div className="flex justify-center gap-2">
-        {STEPS.map((step) => (
-          <div
-            key={step.id}
-            className={`h-2 w-2 rounded-full transition-colors ${
-              step.id === currentStep
-                ? "bg-primary"
-                : step.id < currentStep
-                ? "bg-primary/50"
-                : "bg-muted"
-            }`}
-          />
-        ))}
-      </div>
-
-      {/* エラー表示 */}
+      {/* Error display */}
       {error && (
-        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3">
+          <p className="text-[13px] text-destructive">{error}</p>
         </div>
       )}
 
-      {/* フォーム本体 */}
-      <Card>
-        <CardContent className="pt-6">
+      {/* Form body */}
+      <Card className="border-border/50">
+        <CardContent className="p-6">
           {currentStep === 1 && (
             <StepCompanyInfo
               data={formData}

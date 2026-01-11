@@ -15,22 +15,25 @@ export async function Header() {
   const { data: { user } } = await supabase.auth.getUser();
 
   return (
-    <header className="flex h-14 items-center justify-between border-b bg-background px-6">
-      <div>
-        <h1 className="text-sm font-medium text-muted-foreground">
-          バックオフィスSaaS選定支援
-        </h1>
-      </div>
-      <div className="flex items-center gap-4">
+    <header className="flex h-14 items-center justify-between border-b border-border bg-background px-6">
+      <div />
+      <div className="flex items-center gap-3">
         {user && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <User className="h-4 w-4" />
-            <span>{user.email}</span>
+          <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-1.5">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
+              <User className="h-3.5 w-3.5 text-primary" />
+            </div>
+            <span className="text-[13px] text-muted-foreground">{user.email}</span>
           </div>
         )}
         <form action={signOut}>
-          <Button variant="ghost" size="sm" type="submit">
-            <LogOut className="mr-2 h-4 w-4" />
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            type="submit"
+            className="h-8 gap-2 text-[13px] text-muted-foreground hover:text-foreground"
+          >
+            <LogOut className="h-3.5 w-3.5" />
             ログアウト
           </Button>
         </form>

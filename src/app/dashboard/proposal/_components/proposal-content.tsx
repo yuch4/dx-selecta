@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { ProposalView } from "@/components/proposal/proposal-view";
 import { ProposalActions } from "@/components/proposal/proposal-actions";
-import { generateProposal, getProposal } from "../actions";
+import { generateProposal, getProposal, getProposalById } from "../actions";
 import type { ProposalOutput } from "@/types/proposal";
 import { Loader2 } from "lucide-react";
 
@@ -13,6 +13,7 @@ export function ProposalContent() {
   const sessionId = searchParams.get("sessionId");
   const runId = searchParams.get("runId");
   const solutionId = searchParams.get("solutionId");
+  const proposalId = searchParams.get("id"); // 履歴から直接アクセス用
   
   const [proposal, setProposal] = useState<ProposalOutput | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -21,16 +22,28 @@ export function ProposalContent() {
   
   // 稟議書生成/取得
   const loadProposal = useCallback(async () => {
-    if (!runId || !solutionId) {
-      setError("パラメータが不足しています");
-      setIsLoading(false);
-      return;
-    }
-    
     setIsLoading(true);
     setError(null);
     
     try {
+      // ID指定での表示（履歴からのアクセス）
+      if (proposalId) {
+        const existingProposal = await getProposalById(proposalId);
+        if (existingProposal) {
+          setProposal(existingProposal);
+        } else {
+          setError("稟議書が見つかりません");
+        }
+        return;
+      }
+      
+      // runId/solutionIdでの表示（通常フロー）
+      if (!runId || !solutionId) {
+        setError("パラメータが不足しています。診断から始めてください。");
+        setIsLoading(false);
+        return;
+      }
+      
       // 既存の稟議書を確認
       let existingProposal = await getProposal(runId, solutionId);
       
@@ -46,7 +59,7 @@ export function ProposalContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [runId, solutionId]);
+  }, [proposalId, runId, solutionId]);
   
   useEffect(() => {
     loadProposal();

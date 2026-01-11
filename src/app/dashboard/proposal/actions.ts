@@ -275,3 +275,79 @@ export async function getProposalById(proposalId: string): Promise<ProposalOutpu
   
   return data;
 }
+
+// 履歴アイテムの型
+export type ProposalHistoryItem = {
+  id: string;
+  runId: string;
+  solutionId: string;
+  solutionName: string;
+  solutionVendor: string;
+  solutionCategory: string;
+  generatedAt: string;
+  version: number;
+};
+
+// 稟議書履歴一覧取得
+export async function getProposalHistory(limit: number = 10): Promise<ProposalHistoryItem[]> {
+  const supabase = await createClient();
+  
+  // 現在のユーザーのテナントに紐づくセッションの稟議のみ取得
+  const { data: user, error: userError } = await supabase.auth.getUser();
+  if (userError || !user?.user) {
+    return [];
+  }
+  
+  // ユーザーのテナントを取得
+  const { data: membership, error: memberError } = await supabase
+    .from("tenant_members")
+    .select("tenant_id")
+    .eq("user_id", user.user.id)
+    .limit(1)
+    .single();
+  
+  if (memberError || !membership) {
+    return [];
+  }
+  
+  // 稟議履歴を取得（テナントに紐づくセッション経由）
+  const { data, error } = await supabase
+    .from("proposal_outputs")
+    .select(`
+      id,
+      run_id,
+      primary_solution_id,
+      generated_at,
+      version,
+      search_runs!inner (
+        session_id,
+        diagnosis_sessions!inner (
+          tenant_id
+        )
+      ),
+      solutions!inner (
+        name,
+        vendor,
+        category
+      )
+    `)
+    .eq("search_runs.diagnosis_sessions.tenant_id", membership.tenant_id)
+    .order("generated_at", { ascending: false })
+    .limit(limit);
+  
+  if (error || !data) {
+    console.error("Failed to fetch proposal history:", error);
+    return [];
+  }
+  
+  return data.map((item) => ({
+    id: item.id,
+    runId: item.run_id,
+    solutionId: item.primary_solution_id,
+    solutionName: (item.solutions as unknown as { name: string }).name,
+    solutionVendor: (item.solutions as unknown as { vendor: string }).vendor,
+    solutionCategory: (item.solutions as unknown as { category: string }).category,
+    generatedAt: item.generated_at,
+    version: item.version,
+  }));
+}
