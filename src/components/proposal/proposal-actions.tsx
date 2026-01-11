@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { Copy, RefreshCw, ArrowLeft, Check } from "lucide-react";
+import { Copy, RefreshCw, ArrowLeft, Check, Pencil, Eye } from "lucide-react";
 import { useState } from "react";
 
 interface ProposalActionsProps {
@@ -11,6 +11,8 @@ interface ProposalActionsProps {
   markdownText: string;
   onRegenerate: () => void;
   isRegenerating: boolean;
+  isEditMode?: boolean;
+  onToggleEdit?: () => void;
 }
 
 export function ProposalActions({
@@ -19,6 +21,8 @@ export function ProposalActions({
   markdownText,
   onRegenerate,
   isRegenerating,
+  isEditMode = false,
+  onToggleEdit,
 }: ProposalActionsProps) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
@@ -34,7 +38,7 @@ export function ProposalActions({
   };
   
   const handleBackToCompare = () => {
-    router.push(`/compare?sessionId=${sessionId}&runId=${runId}`);
+    router.push(`/dashboard/compare?sessionId=${sessionId}&runId=${runId}`);
   };
   
   return (
@@ -45,6 +49,26 @@ export function ProposalActions({
       </Button>
       
       <div className="flex items-center gap-3">
+        {/* 編集/プレビュー切替 */}
+        {onToggleEdit && (
+          <Button
+            variant={isEditMode ? "default" : "outline"}
+            onClick={onToggleEdit}
+          >
+            {isEditMode ? (
+              <>
+                <Eye className="mr-2 h-4 w-4" />
+                プレビュー
+              </>
+            ) : (
+              <>
+                <Pencil className="mr-2 h-4 w-4" />
+                編集
+              </>
+            )}
+          </Button>
+        )}
+        
         <Button
           variant="outline"
           onClick={handleCopy}
@@ -66,7 +90,7 @@ export function ProposalActions({
         <Button
           variant="outline"
           onClick={onRegenerate}
-          disabled={isRegenerating}
+          disabled={isRegenerating || isEditMode}
         >
           <RefreshCw className={`mr-2 h-4 w-4 ${isRegenerating ? "animate-spin" : ""}`} />
           再生成

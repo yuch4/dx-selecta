@@ -75,6 +75,21 @@ export interface ScoreBreakdown {
   auditLogMatch: number;
   baseScore: number;
   total: number;
+  // ハイブリッド検索スコア
+  bm25Score?: number;
+  vectorScore?: number;
+  relevanceScore?: number;
+}
+
+// MatchedChunk（マッチしたドキュメントチャンク）
+export interface MatchedChunk {
+  chunkId: string;
+  content: string;
+  docType: string;
+  sourceUrl: string | null;
+  bm25Score: number;
+  vectorScore: number;
+  combinedScore: number;
 }
 
 // SearchExplain（推薦理由）
@@ -86,6 +101,9 @@ export interface SearchExplain {
   }[];
   categoryMatch: boolean;
   summary: string;
+  // ハイブリッド検索で追加
+  matchedChunks?: MatchedChunk[];
+  relevanceHighlights?: string[];
 }
 
 // SearchResult（検索結果）

@@ -259,6 +259,74 @@ export async function getProposal(runId: string, solutionId: string): Promise<Pr
   return data;
 }
 
+// 稟議書更新（編集内容を保存）
+export async function updateProposal(
+  proposalId: string,
+  markdownText: string
+): Promise<ProposalOutput> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error("認証が必要です");
+  }
+  
+  // 既存の稟議書を取得
+  const { data: existing, error: existingError } = await supabase
+    .from("proposal_outputs")
+    .select("*")
+    .eq("id", proposalId)
+    .single();
+  
+  if (existingError || !existing) {
+    throw new Error("稟議書が見つかりません");
+  }
+  
+  // 新しいバージョンを作成（編集履歴として保持）
+  const newVersion = existing.version + 1;
+  
+  const { data: proposal, error: proposalError } = await supabase
+    .from("proposal_outputs")
+    .insert({
+      run_id: existing.run_id,
+      primary_solution_id: existing.primary_solution_id,
+      format: "markdown",
+      markdown_text: markdownText,
+      version: newVersion,
+    })
+    .select()
+    .single();
+  
+  if (proposalError || !proposal) {
+    console.error("Proposal update error:", proposalError);
+    throw new Error("稟議書の更新に失敗しました");
+  }
+  
+  return proposal;
+}
+
+// 稟議書のバージョン履歴取得
+export async function getProposalVersions(
+  runId: string,
+  solutionId: string
+): Promise<Pick<ProposalOutput, "id" | "version" | "generated_at">[]> {
+  const supabase = await createClient();
+  
+  const { data, error } = await supabase
+    .from("proposal_outputs")
+    .select("id, version, generated_at")
+    .eq("run_id", runId)
+    .eq("primary_solution_id", solutionId)
+    .order("version", { ascending: false });
+  
+  if (error) {
+    console.error("Failed to fetch proposal versions:", error);
+    return [];
+  }
+  
+  return data || [];
+}
+
 // 稟議書取得（ID指定）
 export async function getProposalById(proposalId: string): Promise<ProposalOutput | null> {
   const supabase = await createClient();

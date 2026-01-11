@@ -7,7 +7,10 @@ import type {
   ScoreBreakdown,
   SearchExplain,
   InputSnapshot,
+  MatchedChunk,
 } from "@/types/search";
+import { hybridSearch, generateSearchQuery } from "@/services/search/hybridSearch";
+import { calculateFinalScore } from "@/services/search/scoringAlgorithm";
 
 // 診断入力を取得
 async function getDiagnosisInput(sessionId: string) {
@@ -26,11 +29,12 @@ async function getDiagnosisInput(sessionId: string) {
   return data;
 }
 
-// スコア計算
+// スコア計算（ハイブリッド検索結果を含む）
 function calculateScore(
   solution: { category: string },
   facts: { fact_type: string; fact_value: string }[],
-  input: { category: string; constraints: { requireSso: boolean; requireAuditLog: boolean } }
+  input: { category: string; constraints: { requireSso: boolean; requireAuditLog: boolean } },
+  hybridResult?: { bm25Score: number; vectorScore: number; relevanceScore: number }
 ): { score: number; breakdown: ScoreBreakdown } {
   const baseScore = 50;
   let categoryMatch = 0;
@@ -54,7 +58,22 @@ function calculateScore(
     auditLogMatch = input.constraints.requireAuditLog ? 10 : 5;
   }
   
-  const total = Math.min(baseScore + categoryMatch + ssoMatch + auditLogMatch, 100);
+  // ハイブリッド検索がある場合はファイナルスコアを計算
+  let total: number;
+  if (hybridResult) {
+    // ファクトマッチスコアを計算（0-1の範囲）
+    const factMatchCount = (ssoMatch > 0 ? 1 : 0) + (auditLogMatch > 0 ? 1 : 0);
+    const requiredFactCount = (input.constraints.requireSso ? 1 : 0) + (input.constraints.requireAuditLog ? 1 : 0);
+    const factMatchScore = requiredFactCount > 0 ? factMatchCount / requiredFactCount : 1;
+    
+    total = calculateFinalScore({
+      relevanceScore: hybridResult.relevanceScore,
+      factMatchScore,
+      categoryMatch: solution.category === input.category,
+    });
+  } else {
+    total = Math.min(baseScore + categoryMatch + ssoMatch + auditLogMatch, 100);
+  }
   
   return {
     score: total,
@@ -64,15 +83,19 @@ function calculateScore(
       ssoMatch,
       auditLogMatch,
       total,
+      bm25Score: hybridResult?.bm25Score,
+      vectorScore: hybridResult?.vectorScore,
+      relevanceScore: hybridResult?.relevanceScore,
     },
   };
 }
 
-// Explain生成
+// Explain生成（ハイブリッド検索結果を含む）
 function generateExplain(
   solution: { name: string; category: string },
   facts: { fact_type: string; fact_value: string }[],
-  input: { category: string; constraints: { requireSso: boolean; requireAuditLog: boolean } }
+  input: { category: string; constraints: { requireSso: boolean; requireAuditLog: boolean } },
+  matchedChunks?: MatchedChunk[]
 ): SearchExplain {
   const matchedFacts: SearchExplain["matchedFacts"] = [];
   const categoryMatch = solution.category === input.category;
@@ -109,10 +132,26 @@ function generateExplain(
     summary += ` ${matchedFacts.length}件の必須条件を満たしています。`;
   }
   
+  // ハイブリッド検索結果からハイライト生成
+  const relevanceHighlights: string[] = [];
+  if (matchedChunks && matchedChunks.length > 0) {
+    // 上位3件のチャンクからハイライトを抽出
+    matchedChunks.slice(0, 3).forEach((chunk) => {
+      // コンテンツの最初の100文字をハイライトとして使用
+      const highlight = chunk.content.length > 100 
+        ? chunk.content.substring(0, 100) + "..."
+        : chunk.content;
+      relevanceHighlights.push(highlight);
+    });
+    summary += ` ドキュメント分析により${matchedChunks.length}件の関連情報が見つかりました。`;
+  }
+  
   return {
     matchedFacts,
     categoryMatch,
     summary,
+    matchedChunks: matchedChunks?.slice(0, 5), // 上位5件のみ
+    relevanceHighlights,
   };
 }
 
@@ -166,11 +205,49 @@ export async function runSearch(sessionId: string): Promise<SearchRun> {
     filteredSolutions = filteredSolutions.filter((s) => auditSupportedIds.includes(s.id));
   }
   
-  // スコア計算
+  // ハイブリッド検索を実行
+  const searchQuery = generateSearchQuery(input);
+  const filteredSolutionIds = filteredSolutions.map((s) => s.id);
+  
+  let hybridResults: Map<string, { bm25Score: number; vectorScore: number; relevanceScore: number; matchedChunks: MatchedChunk[] }> = new Map();
+  
+  try {
+    const hybridSearchResults = await hybridSearch({
+      query: searchQuery,
+      solutionIds: filteredSolutionIds,
+      limit: 50,
+    });
+    
+    hybridResults = new Map(
+      hybridSearchResults.map((r) => [
+        r.solutionId,
+        {
+          bm25Score: r.bm25Score,
+          vectorScore: r.vectorScore,
+          relevanceScore: r.combinedScore,
+          matchedChunks: r.matchedChunks.map((c) => ({
+            chunkId: c.chunkId,
+            content: c.content,
+            docType: c.docType,
+            sourceUrl: c.sourceUrl,
+            bm25Score: c.bm25Score,
+            vectorScore: c.vectorScore,
+            combinedScore: c.combinedScore,
+          })),
+        },
+      ])
+    );
+  } catch (error) {
+    console.warn("Hybrid search failed, falling back to basic scoring:", error);
+    // ハイブリッド検索が失敗しても基本スコアリングで継続
+  }
+  
+  // スコア計算（ハイブリッド検索結果を含む）
   const scoredSolutions = filteredSolutions.map((solution) => {
     const solutionFacts = facts.filter((f) => f.solution_id === solution.id);
-    const { score, breakdown } = calculateScore(solution, solutionFacts, input);
-    const explain = generateExplain(solution, solutionFacts, input);
+    const hybridResult = hybridResults.get(solution.id);
+    const { score, breakdown } = calculateScore(solution, solutionFacts, input, hybridResult);
+    const explain = generateExplain(solution, solutionFacts, input, hybridResult?.matchedChunks);
     
     return {
       solution,

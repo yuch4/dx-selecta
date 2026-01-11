@@ -109,8 +109,18 @@ export async function completeSession(sessionId: string) {
   redirect(`/dashboard/search?sessionId=${sessionId}`);
 }
 
+// テナント型
+interface Tenant {
+  id: string;
+  name: string;
+  plan: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // 現在のユーザーのテナントを取得
-export async function getUserTenant(): Promise<unknown | null> {
+export async function getUserTenant(): Promise<Tenant | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -162,11 +172,15 @@ export async function getUserTenant(): Promise<unknown | null> {
       return null;
     }
 
-    return tenant;
+    return tenant as Tenant;
   }
 
   if (membership.tenants) {
-    return membership.tenants;
+    // tenantsはリレーションの結果（単一オブジェクトまたは配列）
+    const tenant = Array.isArray(membership.tenants)
+      ? membership.tenants[0]
+      : membership.tenants;
+    return tenant as Tenant;
   }
 
   const { data: tenant, error: tenantError } = await supabase
@@ -180,7 +194,7 @@ export async function getUserTenant(): Promise<unknown | null> {
     return null;
   }
 
-  return tenant;
+  return tenant as Tenant;
 }
 
 // セッション取得

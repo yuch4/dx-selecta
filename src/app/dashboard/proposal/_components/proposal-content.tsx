@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { ProposalView } from "@/components/proposal/proposal-view";
+import { ProposalEditor } from "@/components/proposal/proposal-editor";
 import { ProposalActions } from "@/components/proposal/proposal-actions";
-import { generateProposal, getProposal, getProposalById } from "../actions";
+import { generateProposal, getProposal, getProposalById, updateProposal } from "../actions";
 import type { ProposalOutput } from "@/types/proposal";
 import { Loader2 } from "lucide-react";
 
@@ -18,6 +19,7 @@ export function ProposalContent() {
   const [proposal, setProposal] = useState<ProposalOutput | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // 稟議書生成/取得
@@ -73,12 +75,26 @@ export function ProposalContent() {
     try {
       const newProposal = await generateProposal(runId, solutionId);
       setProposal(newProposal);
+      setIsEditMode(false); // 再生成後は表示モードに戻す
     } catch (err) {
       console.error("Regenerate error:", err);
       setError(err instanceof Error ? err.message : "再生成に失敗しました");
     } finally {
       setIsRegenerating(false);
     }
+  };
+  
+  // 編集後の保存
+  const handleSave = async (markdownText: string): Promise<ProposalOutput> => {
+    const updated = await updateProposal(proposal!.id, markdownText);
+    setProposal(updated);
+    setIsEditMode(false);
+    return updated;
+  };
+  
+  // 編集モード切替
+  const handleToggleEdit = () => {
+    setIsEditMode((prev) => !prev);
   };
   
   // ローディング中
@@ -116,8 +132,12 @@ export function ProposalContent() {
         バージョン {proposal.version} | 生成日時: {new Date(proposal.generated_at).toLocaleString("ja-JP")}
       </div>
       
-      {/* 稟議書表示 */}
-      <ProposalView proposal={proposal} />
+      {/* 稟議書表示 or 編集 */}
+      {isEditMode ? (
+        <ProposalEditor proposal={proposal} onSave={handleSave} />
+      ) : (
+        <ProposalView proposal={proposal} />
+      )}
       
       {/* アクション */}
       {sessionId && runId && (
@@ -127,6 +147,8 @@ export function ProposalContent() {
           markdownText={proposal.markdown_text || ""}
           onRegenerate={handleRegenerate}
           isRegenerating={isRegenerating}
+          isEditMode={isEditMode}
+          onToggleEdit={handleToggleEdit}
         />
       )}
     </div>
