@@ -247,10 +247,11 @@ export async function exportCsv(runId: string): Promise<string> {
     return row;
   });
   
-  // CSV文字列を生成
+  // CSV文字列を生成（UTF-8 BOM付き for Excel）
+  const BOM = "\uFEFF";
   const csvContent = [header, ...rows]
     .map((row) => row.map((cell) => `"${cell}"`).join(","))
     .join("\n");
   
-  return csvContent;
+  return BOM + csvContent;
 }

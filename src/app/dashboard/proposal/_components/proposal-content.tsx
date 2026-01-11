@@ -6,8 +6,10 @@ import { ProposalView } from "@/components/proposal/proposal-view";
 import { ProposalEditor } from "@/components/proposal/proposal-editor";
 import { ProposalActions } from "@/components/proposal/proposal-actions";
 import { generateProposal, getProposal, getProposalById, updateProposal } from "../actions";
+import { generateProposalPdf, downloadPdf, generateFilename } from "@/lib/export/pdf-generator";
 import type { ProposalOutput } from "@/types/proposal";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export function ProposalContent() {
   const searchParams = useSearchParams();
@@ -97,6 +99,35 @@ export function ProposalContent() {
     setIsEditMode((prev) => !prev);
   };
   
+  // PDFダウンロード
+  const handleDownloadPdf = async () => {
+    if (!proposal) return;
+    
+    try {
+      // マークダウンからソリューション名を抽出（最初の#で始まるタイトル行を使用）
+      const titleMatch = proposal.markdown_text?.match(/^#\s+(.+?)\s*導入稟議書/m);
+      const solutionName = titleMatch ? titleMatch[1] : "ソリューション";
+      
+      const metadata = {
+        title: `稟議書 - ${solutionName}導入提案`,
+        author: "DX Selecta",
+        subject: "ソリューション導入稟議書",
+        creator: "DX Selecta - SaaS選定支援システム",
+        generatedAt: proposal.generated_at,
+        version: proposal.version,
+        solutionName,
+      };
+      
+      const pdfBlob = await generateProposalPdf(proposal.markdown_text || "", metadata);
+      const filename = generateFilename(solutionName, "pdf");
+      downloadPdf(pdfBlob, filename);
+      toast.success("PDFのダウンロードを開始しました");
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      toast.error("PDFの生成に失敗しました");
+    }
+  };
+  
   // ローディング中
   if (isLoading) {
     return (
@@ -149,6 +180,7 @@ export function ProposalContent() {
           isRegenerating={isRegenerating}
           isEditMode={isEditMode}
           onToggleEdit={handleToggleEdit}
+          onDownloadPdf={handleDownloadPdf}
         />
       )}
     </div>

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { Copy, RefreshCw, ArrowLeft, Check, Pencil, Eye } from "lucide-react";
 import { useState } from "react";
+import { DownloadMenu } from "./download-menu";
 
 interface ProposalActionsProps {
   sessionId: string;
@@ -13,6 +14,7 @@ interface ProposalActionsProps {
   isRegenerating: boolean;
   isEditMode?: boolean;
   onToggleEdit?: () => void;
+  onDownloadPdf?: () => Promise<void>;
 }
 
 export function ProposalActions({
@@ -23,6 +25,7 @@ export function ProposalActions({
   isRegenerating,
   isEditMode = false,
   onToggleEdit,
+  onDownloadPdf,
 }: ProposalActionsProps) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
@@ -86,6 +89,11 @@ export function ProposalActions({
             </>
           )}
         </Button>
+        
+        {/* PDFダウンロード */}
+        {onDownloadPdf && (
+          <DownloadMenu onDownloadPdf={onDownloadPdf} disabled={isEditMode} />
+        )}
         
         <Button
           variant="outline"
