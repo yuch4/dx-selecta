@@ -118,12 +118,19 @@ export function ProposalContent() {
         solutionName,
       };
       
+      console.log("Starting PDF generation...");
       const pdfBlob = await generateProposalPdf(proposal.markdown_text || "", metadata);
+      console.log("PDF generated, blob size:", pdfBlob.size);
       const filename = generateFilename(solutionName, "pdf");
       downloadPdf(pdfBlob, filename);
-      toast.success("PDFのダウンロードを開始しました");
+      console.log("PDF downloaded:", filename);
+      toast.success("PDFをダウンロードしました");
     } catch (err) {
       console.error("PDF generation error:", err);
+      if (err instanceof Error) {
+        console.error("Error message:", err.message);
+        console.error("Error stack:", err.stack);
+      }
       toast.error("PDFの生成に失敗しました");
     }
   };

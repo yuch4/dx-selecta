@@ -23,7 +23,7 @@ export function CompareActionBar({ selectedIds, sessionId, runId, onRerun, isLoa
     params.set("sessionId", sessionId);
     params.set("runId", runId);
     selectedIds.forEach((id) => params.append("solutions", id));
-    router.push(`/compare?${params.toString()}`);
+    router.push(`/dashboard/compare?${params.toString()}`);
   };
   
   return (

@@ -1,9 +1,21 @@
 import OpenAI from "openai";
 
-// OpenAI クライアント（シングルトン）
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// OpenAI クライアント（遅延初期化）
+let openai: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is not set");
+  }
+  
+  if (!openai) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  
+  return openai;
+}
 
 /**
  * テキストをEmbeddingベクトルに変換
@@ -11,12 +23,10 @@ const openai = new OpenAI({
  * @returns 1536次元のベクトル
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is not set");
-  }
+  const client = getOpenAIClient();
 
   try {
-    const response = await openai.embeddings.create({
+    const response = await client.embeddings.create({
       model: "text-embedding-3-small",
       input: text,
     });
@@ -36,16 +46,14 @@ export async function generateEmbedding(text: string): Promise<number[]> {
  * @returns 1536次元のベクトル配列
  */
 export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is not set");
-  }
+  const client = getOpenAIClient();
 
   if (texts.length === 0) {
     return [];
   }
 
   try {
-    const response = await openai.embeddings.create({
+    const response = await client.embeddings.create({
       model: "text-embedding-3-small",
       input: texts,
     });

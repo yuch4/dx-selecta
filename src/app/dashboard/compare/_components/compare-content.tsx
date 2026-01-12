@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { CompareTable } from "@/components/compare/compare-table";
 import { CompareActions } from "@/components/compare/compare-actions";
@@ -13,6 +13,9 @@ export function CompareContent() {
   const sessionId = searchParams.get("sessionId");
   const runId = searchParams.get("runId");
   const solutionIdsParam = searchParams.getAll("solutions");
+  
+  // 配列を安定させるためにuseMemoを使用
+  const solutionIds = useMemo(() => solutionIdsParam, [solutionIdsParam.join(",")]);
   
   const [matrix, setMatrix] = useState<ComparisonMatrixWithSolutions | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,8 +38,8 @@ export function CompareContent() {
       let existingMatrix = await getMatrix(runId);
       
       // なければ生成
-      if (!existingMatrix && solutionIdsParam.length >= 2) {
-        await generateMatrix(runId, solutionIdsParam);
+      if (!existingMatrix && solutionIds.length >= 2) {
+        await generateMatrix(runId, solutionIds);
         existingMatrix = await getMatrix(runId);
       }
       
@@ -52,7 +55,7 @@ export function CompareContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [runId, solutionIdsParam]);
+  }, [runId, solutionIds]);
   
   useEffect(() => {
     loadMatrix();

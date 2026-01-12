@@ -28,11 +28,11 @@ export function CompareActions({
     params.set("sessionId", sessionId);
     params.set("runId", runId);
     params.set("solutionId", primarySolutionId);
-    router.push(`/proposal?${params.toString()}`);
+    router.push(`/dashboard/proposal?${params.toString()}`);
   };
   
   const handleBackToSearch = () => {
-    router.push(`/search?sessionId=${sessionId}`);
+    router.push(`/dashboard/search?sessionId=${sessionId}`);
   };
   
   return (

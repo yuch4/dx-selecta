@@ -16,19 +16,12 @@ import {
 import type { ProposalSection } from "@/lib/proposal/parser";
 import type { PdfMetadata } from "@/lib/export/pdf-generator";
 
-// 日本語フォント登録（Google Fonts CDN）
+// 日本語フォント登録（Google Fonts CDN - Noto Sans JP）
+// フォントは Regular (400) のみ登録し、Bold は fontWeight スタイルで擬似的に対応
 Font.register({
   family: "NotoSansJP",
-  fonts: [
-    {
-      src: "https://fonts.gstatic.com/s/notosansjp/v52/-F6jfjtqLzI2JPCgQBnw7HFyzSD-AsregP8VFBEj75s.ttf",
-      fontWeight: 400,
-    },
-    {
-      src: "https://fonts.gstatic.com/s/notosansjp/v52/-F6jfjtqLzI2JPCgQBnw7HFyzSD-AsregP8VFJYj75s.ttf",
-      fontWeight: 700,
-    },
-  ],
+  src: "https://fonts.gstatic.com/s/notosansjp/v52/-F6jfjtqLzI2JPCgQBnw7HFyzSD-AsregP8VFBEj75s.ttf",
+  fontWeight: 400,
 });
 
 // スタイル定義
@@ -55,8 +48,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 10,
-    color: "#6b7280",
-    fontWeight: 700,
+    color: "#374151",
   },
   headerDate: {
     fontSize: 9,
@@ -75,15 +67,13 @@ const styles = StyleSheet.create({
     color: "#9ca3af",
   },
   title: {
-    fontSize: 22,
-    fontWeight: 700,
+    fontSize: 24,
     color: "#111827",
     marginBottom: 20,
     textAlign: "center",
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: 700,
+    fontSize: 16,
     color: "#1f2937",
     marginTop: 16,
     marginBottom: 8,
@@ -122,11 +112,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
   tableHeader: {
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#f3f4f6",
     padding: 8,
-    fontWeight: 700,
     fontSize: 10,
-    color: "#374151",
+    color: "#1f2937",
     flex: 1,
     borderRightWidth: 1,
     borderRightColor: "#e5e7eb",
@@ -146,7 +135,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bold: {
-    fontWeight: 700,
+    color: "#111827",
   },
   metadata: {
     marginTop: 30,
@@ -158,7 +147,6 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: "#9ca3af",
     textAlign: "center",
-    fontStyle: "italic",
   },
 });
 
