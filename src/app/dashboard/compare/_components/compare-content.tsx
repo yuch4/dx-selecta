@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { CompareTable } from "@/components/compare/compare-table";
 import { CompareActions } from "@/components/compare/compare-actions";
@@ -12,15 +12,18 @@ export function CompareContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("sessionId");
   const runId = searchParams.get("runId");
-  const solutionIdsParam = searchParams.getAll("solutions");
+  const solutionIds = searchParams.getAll("solutions");
   
-  // 配列を安定させるためにuseMemoを使用
-  const solutionIds = useMemo(() => solutionIdsParam, [solutionIdsParam.join(",")]);
+  // 配列の参照を安定させるためにキーを作成
+  const solutionIdsKey = solutionIds.join(",");
   
   const [matrix, setMatrix] = useState<ComparisonMatrixWithSolutions | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // マトリクス生成/取得を一度だけ実行するためのref
+  const loadedRef = useRef<string | null>(null);
   
   // マトリクス生成/取得
   const loadMatrix = useCallback(async () => {
@@ -30,6 +33,18 @@ export function CompareContent() {
       return;
     }
     
+    // solutionIdsが空の場合は待機（searchParamsがまだ読み込まれていない可能性）
+    if (solutionIds.length === 0) {
+      return;
+    }
+    
+    // 同じキーで既にロード済みの場合はスキップ
+    const loadKey = `${runId}:${solutionIdsKey}`;
+    if (loadedRef.current === loadKey) {
+      return;
+    }
+    loadedRef.current = loadKey;
+    
     setIsLoading(true);
     setError(null);
     
@@ -37,7 +52,7 @@ export function CompareContent() {
       // 既存のマトリクスを確認
       let existingMatrix = await getMatrix(runId);
       
-      // なければ生成
+      // なければ生成（2件以上必要）
       if (!existingMatrix && solutionIds.length >= 2) {
         await generateMatrix(runId, solutionIds);
         existingMatrix = await getMatrix(runId);
@@ -52,10 +67,12 @@ export function CompareContent() {
     } catch (err) {
       console.error("Matrix load error:", err);
       setError(err instanceof Error ? err.message : "比較マトリクスの読み込みに失敗しました");
+      // エラー時はリトライ可能にする
+      loadedRef.current = null;
     } finally {
       setIsLoading(false);
     }
-  }, [runId, solutionIds]);
+  }, [runId, solutionIds, solutionIdsKey]);
   
   useEffect(() => {
     loadMatrix();
