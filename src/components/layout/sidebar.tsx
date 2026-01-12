@@ -8,6 +8,7 @@ import {
   GitCompare,
   FileText,
   LayoutDashboard,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +37,11 @@ const navigation = [
     name: "稟議書",
     href: "/dashboard/proposal",
     icon: FileText,
+  },
+  {
+    name: "履歴",
+    href: "/dashboard/history",
+    icon: History,
   },
 ];
 

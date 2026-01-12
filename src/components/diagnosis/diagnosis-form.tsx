@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { StepCompanyInfo } from "./step-company-info";
 import { StepCategory } from "./step-category";
 import { StepProblems } from "./step-problems";
@@ -11,6 +12,7 @@ import { StepWeights } from "./step-weights";
 import { StepConfirm } from "./step-confirm";
 import { createSession, saveInput, completeSession } from "@/app/dashboard/diagnosis/actions";
 import { DEFAULT_FORM_DATA, type DiagnosisFormData } from "@/types/diagnosis";
+import { PlayCircle } from "lucide-react";
 
 const STEPS = [
   { id: 1, title: "会社属性" },
@@ -23,11 +25,14 @@ const STEPS = [
 
 interface DiagnosisFormProps {
   tenantId: string;
+  existingSessionId?: string;
+  initialFormData?: DiagnosisFormData;
 }
 
-export function DiagnosisForm({ tenantId }: DiagnosisFormProps) {
+export function DiagnosisForm({ tenantId, existingSessionId, initialFormData }: DiagnosisFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState<DiagnosisFormData>(DEFAULT_FORM_DATA);
+  const [formData, setFormData] = useState<DiagnosisFormData>(initialFormData || DEFAULT_FORM_DATA);
+  const [sessionId, setSessionId] = useState<string | null>(existingSessionId || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,14 +55,19 @@ export function DiagnosisForm({ tenantId }: DiagnosisFormProps) {
     setError(null);
 
     try {
-      // セッション作成
-      const session = await createSession(tenantId);
+      // 既存セッションがあればそれを使用、なければ新規作成
+      let currentSessionId: string = sessionId || "";
+      if (!currentSessionId) {
+        const session = await createSession(tenantId);
+        currentSessionId = session.id;
+        setSessionId(currentSessionId);
+      }
 
       // 入力保存
-      await saveInput(session.id, formData);
+      await saveInput(currentSessionId, formData);
 
       // セッション完了（検索ページへリダイレクト）
-      await completeSession(session.id);
+      await completeSession(currentSessionId);
     } catch (err) {
       console.error("Submit error:", err);
       setError(err instanceof Error ? err.message : "エラーが発生しました");
@@ -67,6 +77,19 @@ export function DiagnosisForm({ tenantId }: DiagnosisFormProps) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
+      {/* Resume indicator */}
+      {existingSessionId && (
+        <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 dark:border-blue-800 dark:bg-blue-950">
+          <PlayCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <span className="text-[13px] text-blue-700 dark:text-blue-300">
+            保存された診断を再開しています
+          </span>
+          <Badge variant="secondary" className="ml-auto text-[10px]">
+            下書き
+          </Badge>
+        </div>
+      )}
+
       {/* Progress Header */}
       <div className="space-y-4">
         {/* Step indicator with labels */}
