@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { HistoryItem } from "@/types/history";
+import { STATUS_CONFIG, HISTORY_TYPE_CONFIG } from "@/lib/history";
+import { formatRelativeDate } from "@/lib/history";
 import {
   ClipboardList,
   GitCompare,
@@ -20,75 +22,24 @@ interface HistoryCardProps {
   item: HistoryItem;
 }
 
-const statusConfig = {
-  in_progress: {
-    label: "作業中",
-    variant: "default" as const,
-    icon: Clock,
-    color: "text-blue-600",
-  },
-  completed: {
-    label: "完了",
-    variant: "secondary" as const,
-    icon: CheckCircle2,
-    color: "text-green-600",
-  },
-  archived: {
-    label: "アーカイブ",
-    variant: "outline" as const,
-    icon: Archive,
-    color: "text-muted-foreground",
-  },
+// アイコンマッピング
+const statusIcons = {
+  in_progress: Clock,
+  completed: CheckCircle2,
+  archived: Archive,
 };
 
-const typeConfig = {
-  diagnosis: {
-    icon: ClipboardList,
-    label: "診断",
-    color: "bg-blue-500/10 text-blue-600",
-  },
-  comparison: {
-    icon: GitCompare,
-    label: "比較",
-    color: "bg-purple-500/10 text-purple-600",
-  },
-  proposal: {
-    icon: FileText,
-    label: "稟議書",
-    color: "bg-green-500/10 text-green-600",
-  },
+const typeIcons = {
+  diagnosis: ClipboardList,
+  comparison: GitCompare,
+  proposal: FileText,
 };
-
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
-  const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-  if (diffHours < 1) {
-    const mins = Math.floor(diffMs / (1000 * 60));
-    return `${mins}分前`;
-  }
-  if (diffHours < 24) {
-    return `${Math.floor(diffHours)}時間前`;
-  }
-  if (diffDays < 7) {
-    return `${Math.floor(diffDays)}日前`;
-  }
-
-  return date.toLocaleDateString("ja-JP", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 export function HistoryCard({ item }: HistoryCardProps) {
-  const status = statusConfig[item.status];
-  const type = typeConfig[item.type];
-  const StatusIcon = status.icon;
-  const TypeIcon = type.icon;
+  const status = STATUS_CONFIG[item.status];
+  const type = HISTORY_TYPE_CONFIG[item.type];
+  const StatusIcon = statusIcons[item.status];
+  const TypeIcon = typeIcons[item.type];
 
   // 遷移先を決定
   const getHref = () => {
@@ -130,7 +81,7 @@ export function HistoryCard({ item }: HistoryCardProps) {
 
               <div className="flex items-center gap-3 pt-1">
                 <span className="text-[11px] text-muted-foreground">
-                  {formatDate(item.updatedAt)}
+                  {formatRelativeDate(item.updatedAt)}
                 </span>
 
                 {/* 進捗表示（作業中の場合） */}

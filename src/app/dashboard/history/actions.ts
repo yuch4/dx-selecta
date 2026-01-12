@@ -1,6 +1,9 @@
 "use server";
 
+import { requireTenantUser, requireUser, AuthError } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getPeriodStartDate } from "@/lib/history/utils";
+import { CATEGORY_LABELS } from "@/types/diagnosis";
 import type {
   HistoryItem,
   HistoryFilters,
@@ -9,44 +12,24 @@ import type {
 } from "@/types/history";
 import type { Category, SessionStatus } from "@/types/diagnosis";
 
-// カテゴリ表示名
-const CATEGORY_LABELS: Record<string, string> = {
-  accounting: "会計",
-  expense: "経費精算",
-  attendance: "勤怠管理",
-  hr: "人事労務",
-  workflow: "ワークフロー",
-  e_contract: "電子契約",
-  invoice: "請求書",
-  procurement: "調達",
-};
-
 // 履歴一覧取得
 export async function getHistoryList(
   filters: HistoryFilters = {},
   limit: number = 20,
   offset: number = 0
 ): Promise<HistoryListResponse> {
-  const supabase = await createClient();
+  let tenantId: string;
+  let supabase: Awaited<ReturnType<typeof createClient>>;
 
-  // 現在のユーザーを取得
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return { items: [], total: 0, hasMore: false };
-  }
-
-  // ユーザーのテナントを取得
-  const { data: membership } = await supabase
-    .from("tenant_members")
-    .select("tenant_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .single();
-
-  if (!membership) {
-    return { items: [], total: 0, hasMore: false };
+  try {
+    const ctx = await requireTenantUser();
+    tenantId = ctx.tenantId;
+    supabase = ctx.supabase;
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return { items: [], total: 0, hasMore: false };
+    }
+    throw error;
   }
 
   // クエリを構築
@@ -82,7 +65,7 @@ export async function getHistoryList(
     `,
       { count: "exact" }
     )
-    .eq("tenant_id", membership.tenant_id);
+    .eq("tenant_id", tenantId);
 
   // ステータスフィルター
   if (filters.status && filters.status !== "all") {
@@ -96,24 +79,10 @@ export async function getHistoryList(
 
   // 期間フィルター
   if (filters.period && filters.period !== "all") {
-    const now = new Date();
-    let startDate: Date;
-
-    switch (filters.period) {
-      case "today":
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        break;
-      case "week":
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case "month":
-        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        break;
-      default:
-        startDate = new Date(0);
+    const startDate = getPeriodStartDate(filters.period);
+    if (startDate) {
+      query = query.gte("created_at", startDate);
     }
-
-    query = query.gte("created_at", startDate.toISOString());
   }
 
   // ソートとページネーション
@@ -254,22 +223,24 @@ function generateDescription(
   return "診断完了";
 }
 
-// セッション詳細取得
+// セッション詳細取得（N+1最適化版）
 export async function getSessionDetail(
   sessionId: string
 ): Promise<SessionDetail | null> {
-  const supabase = await createClient();
+  let supabase: Awaited<ReturnType<typeof createClient>>;
 
-  // 現在のユーザーを取得
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return null;
+  try {
+    const ctx = await requireUser();
+    supabase = ctx.supabase;
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return null;
+    }
+    throw error;
   }
 
-  // セッション情報を取得
-  const { data: session, error: sessionError } = await supabase
+  // 1クエリで全データを取得（N+1解消）
+  const { data: sessionData, error: sessionError } = await supabase
     .from("diagnosis_sessions")
     .select(
       `
@@ -277,147 +248,89 @@ export async function getSessionDetail(
       status,
       created_at,
       updated_at,
-      completed_at
+      completed_at,
+      diagnosis_inputs (
+        id,
+        company_industry,
+        company_size,
+        company_region,
+        category,
+        problems,
+        problem_free_text,
+        constraints,
+        weights
+      ),
+      search_runs (
+        id,
+        executed_at,
+        total_candidates,
+        duration_ms,
+        search_results (
+          id,
+          rank,
+          score,
+          concerns,
+          solution_id,
+          solutions (
+            id,
+            name,
+            vendor
+          )
+        ),
+        comparison_matrices (
+          id,
+          created_at,
+          solutions
+        ),
+        proposal_outputs (
+          id,
+          generated_at,
+          format,
+          version,
+          primary_solution_id,
+          markdown_text
+        )
+      )
     `
     )
     .eq("id", sessionId)
     .single();
 
-  if (sessionError || !session) {
+  if (sessionError || !sessionData) {
     console.error("Failed to fetch session:", sessionError);
     return null;
   }
 
-  // 診断入力を取得
-  const { data: inputData } = await supabase
-    .from("diagnosis_inputs")
-    .select("*")
-    .eq("session_id", sessionId)
-    .single();
+  // 診断入力を整形
+  const inputRaw = Array.isArray(sessionData.diagnosis_inputs)
+    ? sessionData.diagnosis_inputs[0]
+    : sessionData.diagnosis_inputs;
 
-  // 検索実行結果を取得
-  const { data: searchRunsData } = await supabase
-    .from("search_runs")
-    .select(
-      `
-      id,
-      executed_at,
-      total_candidates,
-      duration_ms,
-      search_results (
-        id,
-        rank,
-        score,
-        concerns,
-        solution_id,
-        solutions (
-          name,
-          vendor
-        )
-      )
-    `
-    )
-    .eq("session_id", sessionId)
-    .order("executed_at", { ascending: false });
-
-  // 比較マトリクスを取得
-  const runIds = (searchRunsData || []).map((r) => r.id);
-  let comparisonsData: Array<{
-    id: string;
-    created_at: string;
-    solutions: string[];
-  }> = [];
-
-  if (runIds.length > 0) {
-    const { data } = await supabase
-      .from("comparison_matrices")
-      .select("id, created_at, solutions")
-      .in("run_id", runIds);
-    comparisonsData = data || [];
-  }
-
-  // 比較対象のソリューション名を取得
-  const solutionIds = comparisonsData.flatMap((c) => c.solutions);
-  let solutionNamesMap: Record<string, string> = {};
-
-  if (solutionIds.length > 0) {
-    const { data: solutions } = await supabase
-      .from("solutions")
-      .select("id, name")
-      .in("id", solutionIds);
-
-    solutionNamesMap = (solutions || []).reduce(
-      (acc, s) => {
-        acc[s.id] = s.name;
-        return acc;
-      },
-      {} as Record<string, string>
-    );
-  }
-
-  // 稟議出力を取得
-  let proposalsData: Array<{
-    id: string;
-    generated_at: string;
-    format: string;
-    version: number;
-    primary_solution_id: string;
-    markdown_text: string | null;
-  }> = [];
-
-  if (runIds.length > 0) {
-    const { data } = await supabase
-      .from("proposal_outputs")
-      .select(
-        `
-        id,
-        generated_at,
-        format,
-        version,
-        primary_solution_id,
-        markdown_text
-      `
-      )
-      .in("run_id", runIds)
-      .order("generated_at", { ascending: false });
-    proposalsData = data || [];
-  }
-
-  // 稟議の推奨製品名を取得
-  const proposalSolutionIds = proposalsData.map((p) => p.primary_solution_id);
-  let proposalSolutionNames: Record<string, string> = {};
-
-  if (proposalSolutionIds.length > 0) {
-    const { data: solutions } = await supabase
-      .from("solutions")
-      .select("id, name")
-      .in("id", proposalSolutionIds);
-
-    proposalSolutionNames = (solutions || []).reduce(
-      (acc, s) => {
-        acc[s.id] = s.name;
-        return acc;
-      },
-      {} as Record<string, string>
-    );
-  }
-
-  // レスポンスを構築
-  const input = inputData
+  const input = inputRaw
     ? {
-        id: inputData.id,
-        companyIndustry: inputData.company_industry,
-        companySize: inputData.company_size,
-        companyRegion: inputData.company_region,
-        category: inputData.category as Category,
-        problems: inputData.problems || [],
-        problemFreeText: inputData.problem_free_text,
-        constraints: inputData.constraints || {},
-        weights: inputData.weights || {},
+        id: inputRaw.id,
+        companyIndustry: inputRaw.company_industry,
+        companySize: inputRaw.company_size,
+        companyRegion: inputRaw.company_region,
+        category: inputRaw.category as Category,
+        problems: inputRaw.problems || [],
+        problemFreeText: inputRaw.problem_free_text,
+        constraints: inputRaw.constraints || {},
+        weights: inputRaw.weights || {},
       }
     : null;
 
-  const searchRuns = (searchRunsData || []).map((run) => {
+  // 検索実行結果を整形
+  const searchRunsRaw = Array.isArray(sessionData.search_runs)
+    ? sessionData.search_runs
+    : sessionData.search_runs
+      ? [sessionData.search_runs]
+      : [];
+
+  // ソリューションID -> 名前のマップを構築（比較・稟議用）
+  const solutionNamesMap: Record<string, string> = {};
+
+  const searchRuns = searchRunsRaw.map((run) => {
     const results = Array.isArray(run.search_results)
       ? run.search_results
       : run.search_results
@@ -430,7 +343,15 @@ export async function getSessionDetail(
       totalCandidates: run.total_candidates || 0,
       durationMs: run.duration_ms,
       results: results.map((r) => {
-        const sol = r.solutions as unknown as { name: string; vendor: string };
+        const sol = r.solutions as unknown as {
+          id: string;
+          name: string;
+          vendor: string;
+        };
+        // マップに追加
+        if (sol?.id) {
+          solutionNamesMap[sol.id] = sol.name;
+        }
         return {
           id: r.id,
           rank: r.rank,
@@ -443,29 +364,58 @@ export async function getSessionDetail(
     };
   });
 
-  const comparisons = comparisonsData.map((c) => ({
+  // 比較マトリクスを整形
+  const comparisonsRaw = searchRunsRaw.flatMap((run) => {
+    const matrices = Array.isArray(run.comparison_matrices)
+      ? run.comparison_matrices
+      : run.comparison_matrices
+        ? [run.comparison_matrices]
+        : [];
+    return matrices;
+  });
+
+  const comparisons = comparisonsRaw.map((c) => ({
     id: c.id,
     createdAt: c.created_at,
-    solutions: c.solutions,
-    solutionNames: c.solutions.map((id) => solutionNamesMap[id] || "Unknown"),
+    solutions: c.solutions as string[],
+    solutionNames: (c.solutions as string[]).map(
+      (id) => solutionNamesMap[id] || "Unknown"
+    ),
   }));
 
-  const proposals = proposalsData.map((p) => ({
+  // 稟議出力を整形
+  const proposalsRaw = searchRunsRaw.flatMap((run) => {
+    const outputs = Array.isArray(run.proposal_outputs)
+      ? run.proposal_outputs
+      : run.proposal_outputs
+        ? [run.proposal_outputs]
+        : [];
+    return outputs;
+  });
+
+  // 稟議をgeneratedAtで降順ソート
+  proposalsRaw.sort(
+    (a, b) =>
+      new Date(b.generated_at).getTime() - new Date(a.generated_at).getTime()
+  );
+
+  const proposals = proposalsRaw.map((p) => ({
     id: p.id,
     generatedAt: p.generated_at,
     format: p.format as "markdown" | "google_docs",
     version: p.version,
-    primarySolutionName: proposalSolutionNames[p.primary_solution_id] || "Unknown",
+    primarySolutionName:
+      solutionNamesMap[p.primary_solution_id] || "Unknown",
     markdownText: p.markdown_text,
   }));
 
   return {
     session: {
-      id: session.id,
-      status: session.status as SessionStatus,
-      createdAt: session.created_at,
-      updatedAt: session.updated_at,
-      completedAt: session.completed_at,
+      id: sessionData.id,
+      status: sessionData.status as SessionStatus,
+      createdAt: sessionData.created_at,
+      updatedAt: sessionData.updated_at,
+      completedAt: sessionData.completed_at,
     },
     input,
     searchRuns,
@@ -476,14 +426,7 @@ export async function getSessionDetail(
 
 // セッションをアーカイブ
 export async function archiveSession(sessionId: string): Promise<boolean> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error("認証が必要です");
-  }
+  const { supabase } = await requireUser();
 
   const { error } = await supabase
     .from("diagnosis_sessions")

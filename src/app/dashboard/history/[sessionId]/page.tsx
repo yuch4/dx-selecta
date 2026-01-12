@@ -4,6 +4,7 @@ import { getSessionDetail } from "../actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { STATUS_CONFIG, formatDateTime } from "@/lib/history";
 import {
   ArrowLeft,
   ClipboardList,
@@ -27,36 +28,12 @@ interface Props {
   params: Promise<{ sessionId: string }>;
 }
 
-const statusConfig = {
-  in_progress: {
-    label: "作業中",
-    variant: "default" as const,
-    icon: Clock,
-    color: "text-blue-600",
-  },
-  completed: {
-    label: "完了",
-    variant: "secondary" as const,
-    icon: CheckCircle2,
-    color: "text-green-600",
-  },
-  archived: {
-    label: "アーカイブ",
-    variant: "outline" as const,
-    icon: Archive,
-    color: "text-muted-foreground",
-  },
+// アイコンマッピング
+const statusIcons = {
+  in_progress: Clock,
+  completed: CheckCircle2,
+  archived: Archive,
 };
-
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString("ja-JP", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 export default async function SessionDetailPage({ params }: Props) {
   const { sessionId } = await params;
@@ -67,8 +44,8 @@ export default async function SessionDetailPage({ params }: Props) {
   }
 
   const { session, input, searchRuns, comparisons, proposals } = detail;
-  const status = statusConfig[session.status];
-  const StatusIcon = status.icon;
+  const status = STATUS_CONFIG[session.status];
+  const StatusIcon = statusIcons[session.status];
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -102,12 +79,12 @@ export default async function SessionDetailPage({ params }: Props) {
           <div className="flex items-center gap-4 text-[12px] text-muted-foreground">
             <span className="flex items-center gap-1">
               <Calendar className="h-3.5 w-3.5" />
-              作成: {formatDate(session.createdAt)}
+              作成: {formatDateTime(session.createdAt)}
             </span>
             {session.completedAt && (
               <span className="flex items-center gap-1">
                 <CheckCircle2 className="h-3.5 w-3.5" />
-                完了: {formatDate(session.completedAt)}
+                完了: {formatDateTime(session.completedAt)}
               </span>
             )}
           </div>
@@ -245,7 +222,7 @@ export default async function SessionDetailPage({ params }: Props) {
                 className={`space-y-3 ${index > 0 ? "mt-4 border-t pt-4" : ""}`}
               >
                 <div className="flex items-center justify-between text-[12px] text-muted-foreground">
-                  <span>{formatDate(run.executedAt)}</span>
+                  <span>{formatDateTime(run.executedAt)}</span>
                   <span>
                     {run.totalCandidates}件中 {run.results.length}件表示
                     {run.durationMs && ` (${run.durationMs}ms)`}
@@ -304,7 +281,7 @@ export default async function SessionDetailPage({ params }: Props) {
             {comparisons.map((comparison) => (
               <div key={comparison.id} className="space-y-2">
                 <p className="text-[12px] text-muted-foreground">
-                  {formatDate(comparison.createdAt)}
+                  {formatDateTime(comparison.createdAt)}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {comparison.solutionNames.map((name, i) => (
@@ -354,7 +331,7 @@ export default async function SessionDetailPage({ params }: Props) {
                   <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                     <span>v{proposal.version}</span>
                     <span>•</span>
-                    <span>{formatDate(proposal.generatedAt)}</span>
+                    <span>{formatDateTime(proposal.generatedAt)}</span>
                   </div>
                 </div>
                 <Button
