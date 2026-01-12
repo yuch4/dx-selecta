@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Mail } from "lucide-react";
+import { Loader2, Mail, ArrowRight, CheckCircle2, AlertCircle } from "lucide-react";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -80,89 +80,103 @@ export function LoginForm() {
   };
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-center">
-          🎯 DX Selecta
+    <Card className="w-full max-w-[420px] border-border/40 bg-card/80 shadow-2xl shadow-black/5 backdrop-blur-sm">
+      <CardHeader className="space-y-3 pb-6 pt-8 text-center">
+        <CardTitle className="text-xl font-semibold tracking-tight">
+          ログイン
         </CardTitle>
-        <CardDescription className="text-center">
-          メールアドレスでログイン
+        <CardDescription className="text-[13px]">
+          メールアドレスまたはGoogleでログイン
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">メールアドレス</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={isLoading}
-            />
-          </div>
-          
-          {message && (
-            <div
-              className={`rounded-md p-3 text-sm ${
-                message.type === "success"
-                  ? "bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-200"
-                  : "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
-              }`}
-            >
-              {message.text}
-            </div>
-          )}
-          
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                送信中...
-              </>
-            ) : (
-              <>
-                <Mail className="mr-2 h-4 w-4" />
-                マジックリンクを送信
-              </>
-            )}
-          </Button>
-        </form>
-
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">または</span>
-          </div>
-        </div>
-
+      <CardContent className="pb-8">
+        {/* Google Login - Primary action */}
         <Button
           type="button"
           variant="outline"
-          className="w-full"
+          className="mb-6 h-11 w-full gap-3 border-border/60 bg-background text-[14px] font-medium shadow-sm transition-all hover:border-border hover:bg-accent hover:shadow"
           onClick={handleGoogleLogin}
           disabled={isGoogleLoading || isLoading}
         >
           {isGoogleLoading ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              接続中...
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>接続中...</span>
             </>
           ) : (
             <>
-              <GoogleIcon className="mr-2 h-4 w-4" />
-              Googleでログイン
+              <GoogleIcon className="h-4 w-4" />
+              <span>Googleでログイン</span>
             </>
           )}
         </Button>
-        
-        <div className="mt-6 text-center text-sm text-muted-foreground">
-          <p>バックオフィスSaaS選定から稟議までを一気通貫で支援</p>
+
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border/60" />
+          </div>
+          <div className="relative flex justify-center">
+            <span className="bg-card px-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/60">
+              または
+            </span>
+          </div>
         </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-[13px] font-medium">
+              メールアドレス
+            </Label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50" />
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={isLoading}
+                className="h-11 border-border/60 bg-background pl-10 text-[14px] shadow-sm transition-all placeholder:text-muted-foreground/40 focus:border-primary focus:shadow"
+              />
+            </div>
+          </div>
+          
+          {message && (
+            <div
+              className={`flex items-start gap-3 rounded-lg p-4 text-[13px] ${
+                message.type === "success"
+                  ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border border-red-200 bg-red-50 text-red-800"
+              }`}
+            >
+              {message.type === "success" ? (
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+              ) : (
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              )}
+              <span className="leading-relaxed">{message.text}</span>
+            </div>
+          )}
+          
+          <Button 
+            type="submit" 
+            className="h-11 w-full gap-2 text-[14px] font-medium shadow-lg shadow-primary/20 transition-all hover:shadow-xl hover:shadow-primary/25" 
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>送信中...</span>
+              </>
+            ) : (
+              <>
+                <span>マジックリンクを送信</span>
+                <ArrowRight className="h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </form>
       </CardContent>
     </Card>
   );
