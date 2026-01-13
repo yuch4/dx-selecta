@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run lint)",
+      "Bash(npm run test:*)",
+      "Bash(npm run build)",
+      "Bash(python3:*)",
+      "Skill(x-buzz-post-generator:*)",
+      "Skill(job-application-writer:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)"
+    ]
+  },
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "outputStyle": "Explanatory"
+}
